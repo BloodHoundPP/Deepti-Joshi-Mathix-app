@@ -50,16 +50,19 @@ class _StudentsScreenState extends State<StudentsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab_students',
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateStudentScreen()),
-          );
-        },
-        icon: const Icon(Icons.person_add_rounded),
-        label: const Text('New Student'),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 16.0),
+        child: FloatingActionButton.extended(
+          heroTag: 'fab_students',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreateStudentScreen()),
+            );
+          },
+          icon: const Icon(Icons.person_add_rounded),
+          label: const Text('New Student'),
+        ),
       ),
       body: Column(
         children: [

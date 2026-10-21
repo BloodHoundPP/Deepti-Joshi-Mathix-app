@@ -43,44 +43,80 @@ class _CreateBatchScreenState extends State<CreateBatchScreen> {
     super.dispose();
   }
 
+  bool _isSaving = false;
+
   void _saveBatch() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
 
     final provider = Provider.of<AppProvider>(context, listen: false);
+    final batchName = _nameController.text.trim();
+
+    // Check duplicate batch name
+    final isDuplicate = provider.batches.any((b) =>
+        b.id != widget.existingBatch?.id &&
+        b.batchName.trim().toLowerCase() == batchName.toLowerCase());
+
+    if (isDuplicate) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.warning,
+          content: Text('A batch named "$batchName" already exists.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
     final capacity = int.tryParse(_capacityController.text.trim()) ?? 25;
 
-    if (widget.existingBatch == null) {
-      final newBatch = BatchModel(
-        id: 'batch_${DateTime.now().millisecondsSinceEpoch}',
-        batchName: _nameController.text.trim(),
-        schedule: _scheduleController.text.trim(),
-        instructor: 'Prof. Deepti Joshi',
-        subject: 'Mathematics',
-        standard: _standardController.text.trim(),
-        capacity: capacity,
-      );
-      await provider.addBatch(newBatch);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Batch created successfully!')),
+    try {
+      if (widget.existingBatch == null) {
+        final newBatch = BatchModel(
+          id: 'batch_${DateTime.now().millisecondsSinceEpoch}',
+          batchName: batchName,
+          schedule: _scheduleController.text.trim(),
+          instructor: 'Prof. Deepti Joshi',
+          subject: 'Mathematics',
+          standard: _standardController.text.trim(),
+          capacity: capacity,
         );
-        Navigator.pop(context);
+        await provider.addBatch(newBatch);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Batch created successfully!')),
+          );
+          Navigator.pop(context);
+        }
+      } else {
+        final updated = widget.existingBatch!.copyWith(
+          batchName: batchName,
+          schedule: _scheduleController.text.trim(),
+          instructor: 'Prof. Deepti Joshi',
+          subject: 'Mathematics',
+          standard: _standardController.text.trim(),
+          capacity: capacity,
+        );
+        await provider.updateBatch(updated);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Batch updated successfully!')),
+          );
+          Navigator.pop(context);
+        }
       }
-    } else {
-      final updated = widget.existingBatch!.copyWith(
-        batchName: _nameController.text.trim(),
-        schedule: _scheduleController.text.trim(),
-        instructor: 'Prof. Deepti Joshi',
-        subject: 'Mathematics',
-        standard: _standardController.text.trim(),
-        capacity: capacity,
-      );
-      await provider.updateBatch(updated);
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Batch updated successfully!')),
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Failed to save batch: $e'),
+          ),
         );
-        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }
@@ -176,10 +212,21 @@ class _CreateBatchScreenState extends State<CreateBatchScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _saveBatch,
-                icon: const Icon(Icons.save_rounded),
-                label: Text(isEditing ? 'Update Batch Details' : 'Create Batch'),
+                onPressed: _isSaving ? null : _saveBatch,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.save_rounded),
+                label: Text(
+                  _isSaving
+                      ? 'Saving Batch...'
+                      : (isEditing ? 'Update Batch Details' : 'Create Batch'),
+                ),
               ),
+              const SizedBox(height: 36),
             ],
           ),
         ),

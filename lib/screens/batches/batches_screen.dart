@@ -43,16 +43,19 @@ class _BatchesScreenState extends State<BatchesScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab_batches',
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateBatchScreen()),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('New Batch'),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 16.0),
+        child: FloatingActionButton.extended(
+          heroTag: 'fab_batches',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreateBatchScreen()),
+            );
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('New Batch'),
+        ),
       ),
       body: Column(
         children: [

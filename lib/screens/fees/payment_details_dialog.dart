@@ -34,7 +34,10 @@ class _PaymentDetailsDialogState extends State<PaymentDetailsDialog> {
     super.dispose();
   }
 
+  bool _isSaving = false;
+
   void _submitPayment() async {
+    if (_isSaving) return;
     final amt = double.tryParse(_amountController.text.trim()) ?? 0.0;
     if (amt <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -43,19 +46,36 @@ class _PaymentDetailsDialogState extends State<PaymentDetailsDialog> {
       return;
     }
 
-    final provider = Provider.of<AppProvider>(context, listen: false);
-    await provider.recordPayment(
-      feeId: widget.fee.id,
-      paymentAmount: amt,
-      paymentMode: _paymentMode,
-      transactionRef: _refController.text.trim(),
-    );
+    setState(() => _isSaving = true);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment recorded successfully!')),
+    try {
+      final provider = Provider.of<AppProvider>(context, listen: false);
+      await provider.recordPayment(
+        feeId: widget.fee.id,
+        paymentAmount: amt,
+        paymentMode: _paymentMode,
+        transactionRef: _refController.text.trim(),
       );
-      Navigator.pop(context);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment recorded successfully!')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Failed to record payment: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -219,8 +239,14 @@ class _PaymentDetailsDialogState extends State<PaymentDetailsDialog> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: _submitPayment,
-                        child: const Text('Confirm'),
+                        onPressed: _isSaving ? null : _submitPayment,
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Confirm'),
                       ),
                     ),
                   ],

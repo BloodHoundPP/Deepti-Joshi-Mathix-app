@@ -76,7 +76,10 @@ class _CreateAttendanceScreenState extends State<CreateAttendanceScreen> {
     }
   }
 
+  bool _isSaving = false;
+
   void _saveAttendance() async {
+    if (_isSaving) return;
     if (_selectedBatchId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a batch')),
@@ -85,20 +88,63 @@ class _CreateAttendanceScreenState extends State<CreateAttendanceScreen> {
     }
 
     final provider = Provider.of<AppProvider>(context, listen: false);
-    final rec = AttendanceRecordModel(
-      id: widget.existingRecord?.id ?? 'att_${DateTime.now().millisecondsSinceEpoch}',
-      batchId: _selectedBatchId!,
-      attendanceDate: _selectedDate,
-      records: Map.from(_attendanceMap),
-      topicTaught: _topicController.text.trim(),
-    );
 
-    await provider.saveAttendanceSession(rec);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Attendance session saved successfully!')),
+    // If creating a new attendance record, prevent duplicate session for the same batch on the same date
+    if (widget.existingRecord == null) {
+      final existing = provider.attendance.cast<AttendanceRecordModel?>().firstWhere(
+            (a) =>
+                a != null &&
+                a.batchId == _selectedBatchId &&
+                a.attendanceDate.year == _selectedDate.year &&
+                a.attendanceDate.month == _selectedDate.month &&
+                a.attendanceDate.day == _selectedDate.day,
+            orElse: () => null,
+          );
+
+      if (existing != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.warning,
+            content: Text(
+              'Attendance for this batch on this date has already been recorded! Please edit the existing session instead.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final rec = AttendanceRecordModel(
+        id: widget.existingRecord?.id ?? 'att_${DateTime.now().millisecondsSinceEpoch}',
+        batchId: _selectedBatchId!,
+        attendanceDate: _selectedDate,
+        records: Map.from(_attendanceMap),
+        topicTaught: _topicController.text.trim(),
       );
-      Navigator.pop(context);
+
+      await provider.saveAttendanceSession(rec);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Attendance session saved successfully!')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Failed to save attendance: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -122,24 +168,36 @@ class _CreateAttendanceScreenState extends State<CreateAttendanceScreen> {
       appBar: AppBar(
         title: Text(widget.existingRecord != null ? 'Edit Attendance' : 'Mark Attendance Session'),
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -4),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 10,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: ElevatedButton.icon(
+            onPressed: (students.isEmpty || _isSaving) ? null : _saveAttendance,
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.check_circle_rounded),
+            label: Text(
+              _isSaving
+                  ? 'Saving Attendance...'
+                  : 'Save Attendance ($presentCount / $totalCount Present)',
             ),
-          ],
-        ),
-        child: ElevatedButton.icon(
-          onPressed: students.isEmpty ? null : _saveAttendance,
-          icon: const Icon(Icons.check_circle_rounded),
-          label: Text('Save Attendance ($presentCount / $totalCount Present)'),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
           ),
         ),
       ),

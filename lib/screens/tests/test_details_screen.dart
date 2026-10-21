@@ -47,34 +47,54 @@ class _TestDetailsScreenState extends State<TestDetailsScreen> {
     _initialized = true;
   }
 
-  void _saveAllMarks(List<StudentModel> students, TestModel test) async {
-    final provider = Provider.of<AppProvider>(context, listen: false);
-    final List<StudentTestMarkModel> marksToSave = [];
+  bool _isSaving = false;
 
-    for (final s in students) {
-      final text = _marksControllers[s.id]?.text.trim() ?? '';
-      if (text.isNotEmpty) {
-        final val = double.tryParse(text);
-        if (val != null) {
-          final existing = provider.getMarkForStudentAndTest(s.id, test.id);
-          marksToSave.add(
-            StudentTestMarkModel(
-              id: existing?.id ?? 'mark_${s.id}_${test.id}',
-              testId: test.id,
-              studentId: s.id,
-              marksObtained: val,
-              remarks: _remarksControllers[s.id]?.text.trim() ?? '',
-            ),
-          );
+  void _saveAllMarks(List<StudentModel> students, TestModel test) async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+
+    try {
+      final provider = Provider.of<AppProvider>(context, listen: false);
+      final List<StudentTestMarkModel> marksToSave = [];
+
+      for (final s in students) {
+        final text = _marksControllers[s.id]?.text.trim() ?? '';
+        if (text.isNotEmpty) {
+          final val = double.tryParse(text);
+          if (val != null) {
+            final existing = provider.getMarkForStudentAndTest(s.id, test.id);
+            marksToSave.add(
+              StudentTestMarkModel(
+                id: existing?.id ?? 'mark_${s.id}_${test.id}',
+                testId: test.id,
+                studentId: s.id,
+                marksObtained: val,
+                remarks: _remarksControllers[s.id]?.text.trim() ?? '',
+              ),
+            );
+          }
         }
       }
-    }
 
-    await provider.batchSaveMarks(marksToSave);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved scores for ${marksToSave.length} students!')),
-      );
+      await provider.batchSaveMarks(marksToSave);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Saved scores for ${marksToSave.length} students!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Failed to save scores: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -133,24 +153,32 @@ class _TestDetailsScreenState extends State<TestDetailsScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -4),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 10,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: ElevatedButton.icon(
+            onPressed: (students.isEmpty || _isSaving) ? null : () => _saveAllMarks(students, test),
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.check_circle_outline),
+            label: Text(_isSaving ? 'Saving Scores...' : 'Save All Student Scores'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
-          ],
-        ),
-        child: ElevatedButton.icon(
-          onPressed: students.isEmpty ? null : () => _saveAllMarks(students, test),
-          icon: const Icon(Icons.check_circle_outline),
-          label: const Text('Save All Student Scores'),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
           ),
         ),
       ),

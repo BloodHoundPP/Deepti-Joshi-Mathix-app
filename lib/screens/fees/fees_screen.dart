@@ -55,16 +55,19 @@ class _FeesScreenState extends State<FeesScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab_fees',
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateFeeScreen()),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('New Invoice'),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 16.0),
+        child: FloatingActionButton.extended(
+          heroTag: 'fab_fees',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreateFeeScreen()),
+            );
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('New Invoice'),
+        ),
       ),
       body: Column(
         children: [

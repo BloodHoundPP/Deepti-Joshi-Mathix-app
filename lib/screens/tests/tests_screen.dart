@@ -50,16 +50,19 @@ class _TestsScreenState extends State<TestsScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab_tests',
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateTestScreen()),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Schedule Test'),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 16.0),
+        child: FloatingActionButton.extended(
+          heroTag: 'fab_tests',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreateTestScreen()),
+            );
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('Schedule Test'),
+        ),
       ),
       body: Column(
         children: [

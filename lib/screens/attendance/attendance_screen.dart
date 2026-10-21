@@ -46,16 +46,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab_attendance',
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateAttendanceScreen()),
-          );
-        },
-        icon: const Icon(Icons.how_to_reg_rounded),
-        label: const Text('Take Attendance'),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 16.0),
+        child: FloatingActionButton.extended(
+          heroTag: 'fab_attendance',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreateAttendanceScreen()),
+            );
+          },
+          icon: const Icon(Icons.how_to_reg_rounded),
+          label: const Text('Take Attendance'),
+        ),
       ),
       body: Column(
         children: [

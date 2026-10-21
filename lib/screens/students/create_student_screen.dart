@@ -52,7 +52,10 @@ class _CreateStudentScreenState extends State<CreateStudentScreen> {
     super.dispose();
   }
 
+  bool _isSaving = false;
+
   void _saveStudent() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedBatchId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -62,44 +65,78 @@ class _CreateStudentScreenState extends State<CreateStudentScreen> {
     }
 
     final provider = Provider.of<AppProvider>(context, listen: false);
+    final fullName = _nameController.text.trim();
 
-    if (widget.existingStudent == null) {
-      final newStudent = StudentModel(
-        id: 'std_${DateTime.now().millisecondsSinceEpoch}',
-        fullName: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-        parentPhone: _parentPhoneController.text.trim(),
-        address: _addressController.text.trim(),
-        batchId: _selectedBatchId!,
-        email: _emailController.text.trim(),
-        rollNo: '',
-        school: _schoolController.text.trim(),
-        joinDate: DateTime.now(),
+    // Check duplicate student in the selected batch
+    final isDuplicate = provider.students.any((s) =>
+        s.id != widget.existingStudent?.id &&
+        s.batchId == _selectedBatchId &&
+        s.fullName.trim().toLowerCase() == fullName.toLowerCase());
+
+    if (isDuplicate) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.warning,
+          content: Text('A student named "$fullName" is already enrolled in this batch.'),
+        ),
       );
-      await provider.addStudent(newStudent);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Student added successfully!')),
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      if (widget.existingStudent == null) {
+        final newStudent = StudentModel(
+          id: 'std_${DateTime.now().millisecondsSinceEpoch}',
+          fullName: fullName,
+          phone: _phoneController.text.trim(),
+          parentPhone: _parentPhoneController.text.trim(),
+          address: _addressController.text.trim(),
+          batchId: _selectedBatchId!,
+          email: _emailController.text.trim(),
+          rollNo: '',
+          school: _schoolController.text.trim(),
+          joinDate: DateTime.now(),
         );
-        Navigator.pop(context);
+        await provider.addStudent(newStudent);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Student added successfully!')),
+          );
+          Navigator.pop(context);
+        }
+      } else {
+        final updated = widget.existingStudent!.copyWith(
+          fullName: fullName,
+          phone: _phoneController.text.trim(),
+          parentPhone: _parentPhoneController.text.trim(),
+          address: _addressController.text.trim(),
+          batchId: _selectedBatchId!,
+          email: _emailController.text.trim(),
+          rollNo: '',
+          school: _schoolController.text.trim(),
+        );
+        await provider.updateStudent(updated);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Student updated successfully!')),
+          );
+          Navigator.pop(context);
+        }
       }
-    } else {
-      final updated = widget.existingStudent!.copyWith(
-        fullName: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-        parentPhone: _parentPhoneController.text.trim(),
-        address: _addressController.text.trim(),
-        batchId: _selectedBatchId!,
-        email: _emailController.text.trim(),
-        rollNo: '',
-        school: _schoolController.text.trim(),
-      );
-      await provider.updateStudent(updated);
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Student updated successfully!')),
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Failed to save student: $e'),
+          ),
         );
-        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }
@@ -247,10 +284,21 @@ class _CreateStudentScreenState extends State<CreateStudentScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _saveStudent,
-                icon: const Icon(Icons.save_rounded),
-                label: Text(isEditing ? 'Update Student Profile' : 'Enroll Student'),
+                onPressed: _isSaving ? null : _saveStudent,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.save_rounded),
+                label: Text(
+                  _isSaving
+                      ? 'Saving Student...'
+                      : (isEditing ? 'Update Student Profile' : 'Enroll Student'),
+                ),
               ),
+              const SizedBox(height: 36),
             ],
           ),
         ),

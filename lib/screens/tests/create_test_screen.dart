@@ -64,7 +64,10 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     }
   }
 
+  bool _isSaving = false;
+
   void _saveTest() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedBatchId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -74,43 +77,80 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
     }
 
     final provider = Provider.of<AppProvider>(context, listen: false);
+    final title = _titleController.text.trim();
+
+    // Check duplicate test (same batch, same title, same date)
+    final isDuplicate = provider.tests.any((t) =>
+        t.id != widget.existingTest?.id &&
+        t.batchId == _selectedBatchId &&
+        t.testTitle.trim().toLowerCase() == title.toLowerCase() &&
+        t.testDate.year == _selectedDate.year &&
+        t.testDate.month == _selectedDate.month &&
+        t.testDate.day == _selectedDate.day);
+
+    if (isDuplicate) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.warning,
+          content: Text('A test titled "$title" is already scheduled for this batch on this date.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
     final totalMarks = int.tryParse(_totalMarksController.text.trim()) ?? 50;
     final passingMarks = int.tryParse(_passingMarksController.text.trim()) ?? 20;
 
-    if (widget.existingTest == null) {
-      final newTest = TestModel(
-        id: 'test_${DateTime.now().millisecondsSinceEpoch}',
-        testTitle: _titleController.text.trim(),
-        subject: _subjectController.text.trim(),
-        chapter: _chapterController.text.trim(),
-        batchId: _selectedBatchId!,
-        totalMarks: totalMarks,
-        passingMarks: passingMarks,
-        testDate: _selectedDate,
-      );
-      await provider.addTest(newTest);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Test scheduled successfully!')),
+    try {
+      if (widget.existingTest == null) {
+        final newTest = TestModel(
+          id: 'test_${DateTime.now().millisecondsSinceEpoch}',
+          testTitle: title,
+          subject: _subjectController.text.trim(),
+          chapter: _chapterController.text.trim(),
+          batchId: _selectedBatchId!,
+          totalMarks: totalMarks,
+          passingMarks: passingMarks,
+          testDate: _selectedDate,
         );
-        Navigator.pop(context);
+        await provider.addTest(newTest);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Test scheduled successfully!')),
+          );
+          Navigator.pop(context);
+        }
+      } else {
+        final updated = widget.existingTest!.copyWith(
+          testTitle: title,
+          subject: _subjectController.text.trim(),
+          chapter: _chapterController.text.trim(),
+          batchId: _selectedBatchId!,
+          totalMarks: totalMarks,
+          passingMarks: passingMarks,
+          testDate: _selectedDate,
+        );
+        await provider.updateTest(updated);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Test updated successfully!')),
+          );
+          Navigator.pop(context);
+        }
       }
-    } else {
-      final updated = widget.existingTest!.copyWith(
-        testTitle: _titleController.text.trim(),
-        subject: _subjectController.text.trim(),
-        chapter: _chapterController.text.trim(),
-        batchId: _selectedBatchId!,
-        totalMarks: totalMarks,
-        passingMarks: passingMarks,
-        testDate: _selectedDate,
-      );
-      await provider.updateTest(updated);
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Test updated successfully!')),
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Failed to save test: $e'),
+          ),
         );
-        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }
@@ -245,10 +285,21 @@ class _CreateTestScreenState extends State<CreateTestScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _saveTest,
-                icon: const Icon(Icons.save_rounded),
-                label: Text(isEditing ? 'Update Test Details' : 'Save & Schedule Test'),
+                onPressed: _isSaving ? null : _saveTest,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.save_rounded),
+                label: Text(
+                  _isSaving
+                      ? 'Saving Test...'
+                      : (isEditing ? 'Update Test Details' : 'Save & Schedule Test'),
+                ),
               ),
+              const SizedBox(height: 36),
             ],
           ),
         ),

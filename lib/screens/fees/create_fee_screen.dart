@@ -86,7 +86,10 @@ class _CreateFeeScreenState extends State<CreateFeeScreen> {
     }
   }
 
+  bool _isSaving = false;
+
   void _saveFee() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedStudentId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -94,6 +97,29 @@ class _CreateFeeScreenState extends State<CreateFeeScreen> {
       );
       return;
     }
+
+    final provider = Provider.of<AppProvider>(context, listen: false);
+
+    // If creating a new fee, check duplicate fee invoice for this student with this installment
+    if (widget.existingFee == null) {
+      final isDuplicate = provider.fees.any((f) =>
+          f.studentId == _selectedStudentId &&
+          f.installment == _selectedInstallment);
+
+      if (isDuplicate) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.warning,
+            content: Text(
+              'A fee invoice for "$_selectedInstallment" already exists for this student.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() => _isSaving = true);
 
     final total = double.tryParse(_totalAmountController.text.trim()) ?? 0.0;
     final paid = double.tryParse(_paidAmountController.text.trim()) ?? 0.0;
@@ -105,50 +131,63 @@ class _CreateFeeScreenState extends State<CreateFeeScreen> {
       status = FeeStatus.partial;
     }
 
-    final provider = Provider.of<AppProvider>(context, listen: false);
-
-    if (widget.existingFee == null) {
-      final receiptNum = 'RCP-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
-      final newFee = FeeRecordModel(
-        id: 'fee_${DateTime.now().millisecondsSinceEpoch}',
-        studentId: _selectedStudentId!,
-        title: _titleController.text.trim(),
-        installment: _selectedInstallment,
-        totalAmount: total,
-        paidAmount: paid,
-        status: status,
-        dueDate: _selectedDueDate,
-        paidDate: paid > 0 ? DateTime.now() : null,
-        paymentMode: _selectedPaymentMode,
-        transactionRef: _transactionRefController.text.trim(),
-        receiptNo: paid > 0 ? receiptNum : '',
-      );
-      await provider.addFee(newFee);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Fee record created successfully!')),
+    try {
+      if (widget.existingFee == null) {
+        final receiptNum = 'RCP-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+        final newFee = FeeRecordModel(
+          id: 'fee_${DateTime.now().millisecondsSinceEpoch}',
+          studentId: _selectedStudentId!,
+          title: _titleController.text.trim(),
+          installment: _selectedInstallment,
+          totalAmount: total,
+          paidAmount: paid,
+          status: status,
+          dueDate: _selectedDueDate,
+          paidDate: paid > 0 ? DateTime.now() : null,
+          paymentMode: _selectedPaymentMode,
+          transactionRef: _transactionRefController.text.trim(),
+          receiptNo: paid > 0 ? receiptNum : '',
         );
-        Navigator.pop(context);
+        await provider.addFee(newFee);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Fee record created successfully!')),
+          );
+          Navigator.pop(context);
+        }
+      } else {
+        final updated = widget.existingFee!.copyWith(
+          studentId: _selectedStudentId!,
+          title: _titleController.text.trim(),
+          installment: _selectedInstallment,
+          totalAmount: total,
+          paidAmount: paid,
+          status: status,
+          dueDate: _selectedDueDate,
+          paidDate: paid > 0 ? (widget.existingFee!.paidDate ?? DateTime.now()) : null,
+          paymentMode: _selectedPaymentMode,
+          transactionRef: _transactionRefController.text.trim(),
+        );
+        await provider.updateFee(updated);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Fee record updated successfully!')),
+          );
+          Navigator.pop(context);
+        }
       }
-    } else {
-      final updated = widget.existingFee!.copyWith(
-        studentId: _selectedStudentId!,
-        title: _titleController.text.trim(),
-        installment: _selectedInstallment,
-        totalAmount: total,
-        paidAmount: paid,
-        status: status,
-        dueDate: _selectedDueDate,
-        paidDate: paid > 0 ? (widget.existingFee!.paidDate ?? DateTime.now()) : null,
-        paymentMode: _selectedPaymentMode,
-        transactionRef: _transactionRefController.text.trim(),
-      );
-      await provider.updateFee(updated);
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Fee record updated successfully!')),
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Failed to save fee record: $e'),
+          ),
         );
-        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }
@@ -322,10 +361,21 @@ class _CreateFeeScreenState extends State<CreateFeeScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _saveFee,
-                icon: const Icon(Icons.save_rounded),
-                label: Text(isEditing ? 'Update Fee Record' : 'Generate Fee Invoice'),
+                onPressed: _isSaving ? null : _saveFee,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.save_rounded),
+                label: Text(
+                  _isSaving
+                      ? 'Generating Invoice...'
+                      : (isEditing ? 'Update Fee Record' : 'Generate Fee Invoice'),
+                ),
               ),
+              const SizedBox(height: 36),
             ],
           ),
         ),
