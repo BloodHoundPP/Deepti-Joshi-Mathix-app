@@ -80,8 +80,6 @@ class DashboardScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(builder: (_) => const ReportsScreen()),
                 );
-              } else if (val == 'supabase_sync') {
-                _showSupabaseSyncDialog(context, provider);
               } else if (val == 'check_updates') {
                 UpdateService.instance.checkForUpdates(context, showNotificationIfLatest: true);
               } else if (val == 'sign_out') {
@@ -96,28 +94,6 @@ class DashboardScreen extends StatelessWidget {
                     Icon(Icons.insights, size: 18),
                     SizedBox(width: 8),
                     Text('Reports & Analytics'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'supabase_sync',
-                child: Row(
-                  children: [
-                    Icon(
-                      provider.isSupabaseConnected
-                          ? Icons.cloud_done_rounded
-                          : Icons.cloud_outlined,
-                      size: 18,
-                      color: provider.isSupabaseConnected
-                          ? AppColors.success
-                          : AppColors.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      provider.isSupabaseConnected
-                          ? 'Supabase Cloud (Connected)'
-                          : 'Supabase Cloud (Offline)',
-                    ),
                   ],
                 ),
               ),
