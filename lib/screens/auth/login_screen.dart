@@ -199,8 +199,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isCloud = AuthService.isCloudReady;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -255,42 +253,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       fontSize: 14,
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Supabase Cloud Connection Status Badge
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isCloud ? AppColors.successLight : AppColors.warningLight,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isCloud
-                              ? AppColors.success.withOpacity(0.3)
-                              : AppColors.warning.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isCloud ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
-                            size: 14,
-                            color: isCloud ? AppColors.success : AppColors.warning,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isCloud ? 'Supabase Auth Connected' : 'Local / Offline Mode',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: isCloud ? AppColors.success : AppColors.warning,
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
