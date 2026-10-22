@@ -13,9 +13,12 @@ class StudentsScreen extends StatefulWidget {
   State<StudentsScreen> createState() => _StudentsScreenState();
 }
 
+enum StudentSortOption { nameAsc, nameDesc, attendanceDesc }
+
 class _StudentsScreenState extends State<StudentsScreen> {
   String _searchQuery = '';
   String? _selectedBatchFilter;
+  StudentSortOption _sortOption = StudentSortOption.nameAsc;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +36,21 @@ class _StudentsScreenState extends State<StudentsScreen> {
           s.parentPhone.toLowerCase().contains(q) ||
           s.school.toLowerCase().contains(q);
     }).toList();
+
+    filteredStudents.sort((a, b) {
+      switch (_sortOption) {
+        case StudentSortOption.nameAsc:
+          return a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase());
+        case StudentSortOption.nameDesc:
+          return b.fullName.toLowerCase().compareTo(a.fullName.toLowerCase());
+        case StudentSortOption.attendanceDesc:
+          final attA = provider.getStudentAttendancePercentage(a.id, a.batchId);
+          final attB = provider.getStudentAttendancePercentage(b.id, b.batchId);
+          final comp = attB.compareTo(attA);
+          if (comp != 0) return comp;
+          return a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase());
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -114,6 +132,41 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           ),
                         );
                       }),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Sort horizontal chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      FilterChip(
+                        avatar: const Icon(Icons.sort_by_alpha, size: 16),
+                        selected: _sortOption == StudentSortOption.nameAsc,
+                        label: const Text('Alphabetical (A-Z)'),
+                        onSelected: (selected) {
+                          if (selected) setState(() => _sortOption = StudentSortOption.nameAsc);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        avatar: const Icon(Icons.sort_by_alpha, size: 16),
+                        selected: _sortOption == StudentSortOption.nameDesc,
+                        label: const Text('Name (Z-A)'),
+                        onSelected: (selected) {
+                          if (selected) setState(() => _sortOption = StudentSortOption.nameDesc);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        avatar: const Icon(Icons.percent_rounded, size: 16),
+                        selected: _sortOption == StudentSortOption.attendanceDesc,
+                        label: const Text('Highest Attendance'),
+                        onSelected: (selected) {
+                          if (selected) setState(() => _sortOption = StudentSortOption.attendanceDesc);
+                        },
+                      ),
                     ],
                   ),
                 ),

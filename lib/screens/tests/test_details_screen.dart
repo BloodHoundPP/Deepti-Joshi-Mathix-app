@@ -8,6 +8,15 @@ import '../../theme/app_colors.dart';
 import 'create_test_screen.dart';
 import '../../widgets/empty_state.dart';
 
+enum TestScoreSortMode {
+  alphabetical,
+  highestMarks,
+  lowestMarks,
+  passedOnly,
+  failedOnly,
+  ungradedOnly,
+}
+
 class TestDetailsScreen extends StatefulWidget {
   final String testId;
 
@@ -21,6 +30,7 @@ class _TestDetailsScreenState extends State<TestDetailsScreen> {
   final Map<String, TextEditingController> _marksControllers = {};
   final Map<String, TextEditingController> _remarksControllers = {};
   bool _initialized = false;
+  TestScoreSortMode _sortMode = TestScoreSortMode.alphabetical;
 
   @override
   void dispose() {
@@ -45,6 +55,15 @@ class _TestDetailsScreenState extends State<TestDetailsScreen> {
       );
     }
     _initialized = true;
+  }
+
+  double? _getScore(String studentId, TestModel test, AppProvider provider) {
+    final text = _marksControllers[studentId]?.text.trim() ?? '';
+    if (text.isNotEmpty) {
+      return double.tryParse(text);
+    }
+    final stored = provider.getMarkForStudentAndTest(studentId, test.id);
+    return stored?.marksObtained;
   }
 
   bool _isSaving = false;
@@ -120,15 +139,71 @@ class _TestDetailsScreenState extends State<TestDetailsScreen> {
     double avgScore = 0.0;
     double highestScore = 0.0;
     int passCount = 0;
+    int failCount = 0;
+    int scoredCount = 0;
+
+    for (final s in students) {
+      final sc = _getScore(s.id, test, provider);
+      if (sc != null) {
+        scoredCount++;
+        if (sc > highestScore) highestScore = sc;
+        if (sc >= test.passingMarks) {
+          passCount++;
+        } else {
+          failCount++;
+        }
+      }
+    }
+    final unscoredCount = students.length - scoredCount;
     if (recordedMarks.isNotEmpty) {
       double sum = 0.0;
       for (final m in recordedMarks) {
         sum += m.marksObtained;
-        if (m.marksObtained > highestScore) highestScore = m.marksObtained;
-        if (m.marksObtained >= test.passingMarks) passCount++;
       }
       avgScore = sum / recordedMarks.length;
     }
+
+    final displayedStudents = students.where((s) {
+      final score = _getScore(s.id, test, provider);
+      if (_sortMode == TestScoreSortMode.passedOnly) {
+        return score != null && score >= test.passingMarks;
+      }
+      if (_sortMode == TestScoreSortMode.failedOnly) {
+        return score != null && score < test.passingMarks;
+      }
+      if (_sortMode == TestScoreSortMode.ungradedOnly) {
+        return score == null;
+      }
+      return true;
+    }).toList();
+
+    displayedStudents.sort((a, b) {
+      final scoreA = _getScore(a.id, test, provider);
+      final scoreB = _getScore(b.id, test, provider);
+
+      if (_sortMode == TestScoreSortMode.highestMarks || _sortMode == TestScoreSortMode.passedOnly) {
+        if (scoreA != null && scoreB != null) {
+          final comp = scoreB.compareTo(scoreA); // Highest first
+          if (comp != 0) return comp;
+        } else if (scoreA != null) {
+          return -1;
+        } else if (scoreB != null) {
+          return 1;
+        }
+      } else if (_sortMode == TestScoreSortMode.lowestMarks || _sortMode == TestScoreSortMode.failedOnly) {
+        if (scoreA != null && scoreB != null) {
+          final comp = scoreA.compareTo(scoreB); // Lowest first
+          if (comp != 0) return comp;
+        } else if (scoreA != null) {
+          return -1;
+        } else if (scoreB != null) {
+          return 1;
+        }
+      }
+
+      // Default / tie-breaker: Alphabetical order (A-Z)
+      return a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase());
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -290,13 +365,83 @@ class _TestDetailsScreenState extends State<TestDetailsScreen> {
                     ),
                   ),
                   Text(
-                    '${students.length} Enrolled',
+                    'Showing ${displayedStudents.length} of ${students.length}',
                     style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
+
+            // Horizontal Sort & Filter Chips
+            if (students.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      FilterChip(
+                        avatar: const Icon(Icons.sort_by_alpha, size: 16),
+                        selected: _sortMode == TestScoreSortMode.alphabetical,
+                        label: Text('Alphabetical (A-Z) (${students.length})'),
+                        onSelected: (selected) {
+                          if (selected) setState(() => _sortMode = TestScoreSortMode.alphabetical);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        avatar: const Icon(Icons.trending_up_rounded, size: 16, color: AppColors.primary),
+                        selected: _sortMode == TestScoreSortMode.highestMarks,
+                        label: const Text('Higher to Lower'),
+                        onSelected: (selected) {
+                          if (selected) setState(() => _sortMode = TestScoreSortMode.highestMarks);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        avatar: const Icon(Icons.trending_down_rounded, size: 16, color: AppColors.textSecondary),
+                        selected: _sortMode == TestScoreSortMode.lowestMarks,
+                        label: const Text('Lower to Higher'),
+                        onSelected: (selected) {
+                          if (selected) setState(() => _sortMode = TestScoreSortMode.lowestMarks);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        avatar: const Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
+                        selected: _sortMode == TestScoreSortMode.passedOnly,
+                        label: Text('Passed ($passCount)'),
+                        onSelected: (selected) {
+                          if (selected) setState(() => _sortMode = TestScoreSortMode.passedOnly);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        avatar: const Icon(Icons.error_outline, size: 16, color: AppColors.error),
+                        selected: _sortMode == TestScoreSortMode.failedOnly,
+                        label: Text('Below Passing ($failCount)'),
+                        onSelected: (selected) {
+                          if (selected) setState(() => _sortMode = TestScoreSortMode.failedOnly);
+                        },
+                      ),
+                      if (unscoredCount > 0) ...[
+                        const SizedBox(width: 8),
+                        FilterChip(
+                          avatar: const Icon(Icons.pending_outlined, size: 16, color: AppColors.warning),
+                          selected: _sortMode == TestScoreSortMode.ungradedOnly,
+                          label: Text('Ungraded ($unscoredCount)'),
+                          onSelected: (selected) {
+                            if (selected) setState(() => _sortMode = TestScoreSortMode.ungradedOnly);
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
 
             // Students Scoring List
             students.isEmpty
@@ -304,92 +449,125 @@ class _TestDetailsScreenState extends State<TestDetailsScreen> {
                     title: 'No Students Enrolled in this Batch',
                     description: 'Enroll students in this batch before assigning test scores.',
                   )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                    itemCount: students.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final student = students[index];
-                      final marksCtrl = _marksControllers[student.id];
-                      final remarksCtrl = _remarksControllers[student.id];
-
-                      return Card(
+                : displayedStudents.isEmpty
+                    ? Center(
                         child: Padding(
-                          padding: const EdgeInsets.all(14),
+                          padding: const EdgeInsets.symmetric(vertical: 24),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: AppColors.primaryLight,
-                                    child: Text(
-                                      student.fullName.isNotEmpty ? student.fullName[0] : 'S',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          student.fullName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        if (student.school.isNotEmpty)
-                                          Text(
-                                            student.school,
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              color: AppColors.textMuted,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  // Score Input Box
-                                  SizedBox(
-                                    width: 90,
-                                    child: TextFormField(
-                                      controller: marksCtrl,
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                      textAlign: TextAlign.center,
-                                      decoration: InputDecoration(
-                                        hintText: '0 - ${test.totalMarks}',
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                        suffixText: 'M',
-                                      ),
-                                      onChanged: (_) => setState(() {}),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              TextFormField(
-                                controller: remarksCtrl,
-                                decoration: const InputDecoration(
-                                  hintText: 'Feedback / Remarks (optional)',
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  isDense: true,
-                                ),
+                              const Icon(Icons.filter_list_off, size: 40, color: AppColors.textMuted),
+                              const SizedBox(height: 8),
+                              const Text('No students match this filter', style: TextStyle(color: AppColors.textSecondary)),
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: () => setState(() => _sortMode = TestScoreSortMode.alphabetical),
+                                child: const Text('Show All Students'),
                               ),
                             ],
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                        itemCount: displayedStudents.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final student = displayedStudents[index];
+                          final marksCtrl = _marksControllers[student.id];
+                          final remarksCtrl = _remarksControllers[student.id];
+                          final currentScore = _getScore(student.id, test, provider);
+
+                          return Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(14),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: AppColors.primaryLight,
+                                        child: Text(
+                                          student.fullName.isNotEmpty ? student.fullName[0] : 'S',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              student.fullName,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            if (student.school.isNotEmpty)
+                                              Text(
+                                                student.school,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppColors.textMuted,
+                                                ),
+                                              ),
+                                            if (currentScore != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 2),
+                                                child: Text(
+                                                  currentScore >= test.passingMarks ? 'Passed' : 'Below Passing',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: currentScore >= test.passingMarks
+                                                        ? AppColors.success
+                                                        : AppColors.error,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Score Input Box
+                                      SizedBox(
+                                        width: 90,
+                                        child: TextFormField(
+                                          controller: marksCtrl,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          textAlign: TextAlign.center,
+                                          decoration: InputDecoration(
+                                            hintText: '0 - ${test.totalMarks}',
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                            suffixText: 'M',
+                                          ),
+                                          onChanged: (_) => setState(() {}),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextFormField(
+                                    controller: remarksCtrl,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Feedback / Remarks (optional)',
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      isDense: true,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
           ],
         ),
       ),

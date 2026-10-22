@@ -80,6 +80,8 @@ class DashboardScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(builder: (_) => const ReportsScreen()),
                 );
+              } else if (val == 'cloud_sync') {
+                _showSupabaseSyncDialog(context, provider);
               } else if (val == 'check_updates') {
                 UpdateService.instance.checkForUpdates(context, showNotificationIfLatest: true);
               } else if (val == 'sign_out') {
@@ -94,6 +96,16 @@ class DashboardScreen extends StatelessWidget {
                     Icon(Icons.insights, size: 18),
                     SizedBox(width: 8),
                     Text('Reports & Analytics'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'cloud_sync',
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_sync_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('Cloud Backup & Sync'),
                   ],
                 ),
               ),

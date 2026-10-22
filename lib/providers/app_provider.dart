@@ -20,7 +20,8 @@ class AppProvider with ChangeNotifier {
   List<FeeRecordModel> _fees = [];
 
   List<BatchModel> get batches => List.unmodifiable(_batches);
-  List<StudentModel> get students => List.unmodifiable(_students);
+  List<StudentModel> get students =>
+      List.unmodifiable(_students..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase())));
   List<TestModel> get tests => List.unmodifiable(_tests);
   List<StudentTestMarkModel> get marks => List.unmodifiable(_marks);
   List<AttendanceRecordModel> get attendance => List.unmodifiable(_attendance);
@@ -38,6 +39,7 @@ class AppProvider with ChangeNotifier {
 
     _batches = await StorageService.loadBatches();
     _students = await StorageService.loadStudents();
+    _students.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
     _tests = await StorageService.loadTests();
     _marks = await StorageService.loadTestMarks();
     _attendance = await StorageService.loadAttendance();
@@ -128,11 +130,14 @@ class AppProvider with ChangeNotifier {
   }
 
   List<StudentModel> getStudentsByBatch(String batchId) {
-    return _students.where((s) => s.batchId == batchId).toList();
+    final list = _students.where((s) => s.batchId == batchId).toList();
+    list.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+    return list;
   }
 
   Future<void> addStudent(StudentModel student) async {
     _students.add(student);
+    _students.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
     await StorageService.saveStudents(_students);
     if (SupabaseService.isReady) {
       try {
@@ -152,6 +157,7 @@ class AppProvider with ChangeNotifier {
     final index = _students.indexWhere((s) => s.id == student.id);
     if (index != -1) {
       _students[index] = student;
+      _students.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
       await StorageService.saveStudents(_students);
       if (SupabaseService.isReady) {
         try {

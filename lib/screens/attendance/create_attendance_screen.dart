@@ -21,12 +21,21 @@ class CreateAttendanceScreen extends StatefulWidget {
   State<CreateAttendanceScreen> createState() => _CreateAttendanceScreenState();
 }
 
+enum AttendanceSortMode {
+  alphabetical,
+  presentFirst,
+  absentFirst,
+  presentOnly,
+  absentOnly,
+}
+
 class _CreateAttendanceScreenState extends State<CreateAttendanceScreen> {
   String? _selectedBatchId;
   late DateTime _selectedDate;
   late TextEditingController _topicController;
   final Map<String, bool> _attendanceMap = {};
   bool _initialized = false;
+  AttendanceSortMode _attendanceSortMode = AttendanceSortMode.alphabetical;
 
   @override
   void initState() {
@@ -162,7 +171,30 @@ class _CreateAttendanceScreenState extends State<CreateAttendanceScreen> {
 
     final presentCount = _attendanceMap.values.where((v) => v).length;
     final totalCount = students.length;
+    final absentCount = totalCount - presentCount;
     final pct = totalCount == 0 ? 0.0 : (presentCount / totalCount) * 100;
+
+    final displayedStudents = students.where((s) {
+      final isPresent = _attendanceMap[s.id] ?? true;
+      if (_attendanceSortMode == AttendanceSortMode.presentOnly && !isPresent) return false;
+      if (_attendanceSortMode == AttendanceSortMode.absentOnly && isPresent) return false;
+      return true;
+    }).toList();
+
+    displayedStudents.sort((a, b) {
+      final isPresA = _attendanceMap[a.id] ?? true;
+      final isPresB = _attendanceMap[b.id] ?? true;
+      if (_attendanceSortMode == AttendanceSortMode.presentFirst) {
+        if (isPresA != isPresB) {
+          return isPresA ? -1 : 1;
+        }
+      } else if (_attendanceSortMode == AttendanceSortMode.absentFirst) {
+        if (isPresA != isPresB) {
+          return !isPresA ? -1 : 1;
+        }
+      }
+      return a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase());
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -314,58 +346,132 @@ class _CreateAttendanceScreenState extends State<CreateAttendanceScreen> {
               ),
             const SizedBox(height: 12),
 
+            // Sort & Filter chips (like in students list with batch-wise sorting)
+            if (students.isNotEmpty) ...[
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    FilterChip(
+                      avatar: const Icon(Icons.sort_by_alpha, size: 16),
+                      selected: _attendanceSortMode == AttendanceSortMode.alphabetical,
+                      label: Text('Alphabetical (A-Z) (${students.length})'),
+                      onSelected: (selected) {
+                        if (selected) setState(() => _attendanceSortMode = AttendanceSortMode.alphabetical);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      avatar: const Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
+                      selected: _attendanceSortMode == AttendanceSortMode.presentFirst,
+                      label: Text('Present First ($presentCount)'),
+                      onSelected: (selected) {
+                        if (selected) setState(() => _attendanceSortMode = AttendanceSortMode.presentFirst);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      avatar: const Icon(Icons.highlight_off, size: 16, color: AppColors.error),
+                      selected: _attendanceSortMode == AttendanceSortMode.absentFirst,
+                      label: Text('Absent First ($absentCount)'),
+                      onSelected: (selected) {
+                        if (selected) setState(() => _attendanceSortMode = AttendanceSortMode.absentFirst);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      avatar: const Icon(Icons.check_circle, size: 16, color: AppColors.success),
+                      selected: _attendanceSortMode == AttendanceSortMode.presentOnly,
+                      label: Text('Present Only ($presentCount)'),
+                      onSelected: (selected) {
+                        if (selected) setState(() => _attendanceSortMode = AttendanceSortMode.presentOnly);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      avatar: const Icon(Icons.cancel, size: 16, color: AppColors.error),
+                      selected: _attendanceSortMode == AttendanceSortMode.absentOnly,
+                      label: Text('Absent Only ($absentCount)'),
+                      onSelected: (selected) {
+                        if (selected) setState(() => _attendanceSortMode = AttendanceSortMode.absentOnly);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
             // Student Toggles
             students.isEmpty
                 ? const EmptyStateWidget(
                     title: 'No Students in Batch',
                     description: 'Add students to this batch before marking attendance.',
                   )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: students.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final student = students[index];
-                      final isPresent = _attendanceMap[student.id] ?? true;
-
-                      return Card(
-                        child: SwitchListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          secondary: CircleAvatar(
-                            backgroundColor: isPresent ? AppColors.successLight : AppColors.errorLight,
-                            child: Icon(
-                              isPresent ? Icons.check : Icons.close,
-                              color: isPresent ? AppColors.success : AppColors.error,
-                              size: 18,
-                            ),
+                : displayedStudents.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Column(
+                            children: [
+                              const Icon(Icons.filter_list_off, size: 48, color: AppColors.textMuted),
+                              const SizedBox(height: 8),
+                              const Text('No students match this filter', style: TextStyle(color: AppColors.textSecondary)),
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: () => setState(() => _attendanceSortMode = AttendanceSortMode.alphabetical),
+                                child: const Text('Show All Students'),
+                              ),
+                            ],
                           ),
-                          title: Text(
-                            student.fullName,
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                          ),
-                          subtitle: Text(
-                            isPresent ? 'Present' : 'Absent',
-                            style: TextStyle(
-                              color: isPresent ? AppColors.success : AppColors.error,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          value: isPresent,
-                          activeThumbColor: AppColors.success,
-                          activeTrackColor: AppColors.successLight,
-                          inactiveThumbColor: AppColors.error,
-                          inactiveTrackColor: AppColors.errorLight,
-                          onChanged: (val) {
-                            setState(() {
-                              _attendanceMap[student.id] = val;
-                            });
-                          },
                         ),
-                      );
-                    },
-                  ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: displayedStudents.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final student = displayedStudents[index];
+                          final isPresent = _attendanceMap[student.id] ?? true;
+
+                          return Card(
+                            child: SwitchListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              secondary: CircleAvatar(
+                                backgroundColor: isPresent ? AppColors.successLight : AppColors.errorLight,
+                                child: Icon(
+                                  isPresent ? Icons.check : Icons.close,
+                                  color: isPresent ? AppColors.success : AppColors.error,
+                                  size: 18,
+                                ),
+                              ),
+                              title: Text(
+                                student.fullName,
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                              ),
+                              subtitle: Text(
+                                isPresent ? 'Present' : 'Absent',
+                                style: TextStyle(
+                                  color: isPresent ? AppColors.success : AppColors.error,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              value: isPresent,
+                              activeThumbColor: AppColors.success,
+                              activeTrackColor: AppColors.successLight,
+                              inactiveThumbColor: AppColors.error,
+                              inactiveTrackColor: AppColors.errorLight,
+                              onChanged: (val) {
+                                setState(() {
+                                  _attendanceMap[student.id] = val;
+                                });
+                              },
+                            ),
+                          );
+                        },
+                      ),
           ],
         ),
       ),
