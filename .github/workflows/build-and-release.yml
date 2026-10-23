@@ -54,18 +54,22 @@ jobs:
         run: flutter pub get
 
       - name: Configure Keystore for Release Signing
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-          echo "storePassword=${KEYSTORE_PASSWORD:-deeptijoshi2025}" > android/key.properties
-          echo "keyPassword=${KEY_PASSWORD:-deeptijoshi2025}" >> android/key.properties
-          echo "keyAlias=${KEY_ALIAS:-upload}" >> android/key.properties
-          echo "storeFile=upload-keystore.jks" >> android/key.properties
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+            echo "storePassword=${KEYSTORE_PASSWORD:-deeptijoshi2025}" > android/key.properties
+            echo "keyPassword=${KEY_PASSWORD:-deeptijoshi2025}" >> android/key.properties
+            echo "keyAlias=${KEY_ALIAS:-upload}" >> android/key.properties
+            echo "storeFile=upload-keystore.jks" >> android/key.properties
+            echo "Keystore configured successfully."
+          else
+            echo "KEYSTORE_BASE64 secret not set; skipping keystore configuration."
+          fi
 
       - name: Determine Release Tag & Version
         id: vars
