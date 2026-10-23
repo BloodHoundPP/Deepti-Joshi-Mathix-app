@@ -32,6 +32,7 @@ migrate_working_dir/
 key.properties
 *.keystore
 *.jks
+*keystore_base64.txt
 
 # Flutter / Dart / Pub related
 **/doc/api/

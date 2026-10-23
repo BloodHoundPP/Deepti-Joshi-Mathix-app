@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:ota_update/ota_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_colors.dart';
 
 class GitHubReleaseInfo {
@@ -26,6 +27,9 @@ class GitHubReleaseInfo {
 class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
+
+  static const String _keyDismissedVersion = 'dismissed_update_version';
+  static const String _keyDismissedTimestamp = 'dismissed_update_timestamp';
 
   static String get githubOwner =>
       dotenv.env['GITHUB_REPO_OWNER'] ?? 'BloodHoundPP';
@@ -160,7 +164,24 @@ class UpdateService {
       final hasUpdate = isNewerVersion(release.version, currentVersion);
 
       if (hasUpdate) {
-        _showUpdateDialog(context, release, currentVersion);
+        // If this is an automatic startup check (not manual via menu),
+        // check if user clicked "Later" for this specific release within the last 24 hours.
+        if (!showNotificationIfLatest) {
+          final prefs = await SharedPreferences.getInstance();
+          final dismissedVersion = prefs.getString(_keyDismissedVersion);
+          final dismissedTime = prefs.getInt(_keyDismissedTimestamp) ?? 0;
+          final now = DateTime.now().millisecondsSinceEpoch;
+          const snoozeDuration = 24 * 60 * 60 * 1000; // 24 hours
+
+          if (dismissedVersion == release.version && (now - dismissedTime) < snoozeDuration) {
+            debugPrint('[UpdateService] Update v${release.version} was snoozed by user. Skipping dialog.');
+            return;
+          }
+        }
+
+        if (context.mounted) {
+          _showUpdateDialog(context, release, currentVersion);
+        }
       } else if (showNotificationIfLatest) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -277,7 +298,14 @@ class UpdateService {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.of(dialogCtx).pop(),
+                    onPressed: () async {
+                      Navigator.of(dialogCtx).pop();
+                      try {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setString(_keyDismissedVersion, release.version);
+                        await prefs.setInt(_keyDismissedTimestamp, DateTime.now().millisecondsSinceEpoch);
+                      } catch (_) {}
+                    },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(

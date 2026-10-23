@@ -1,0 +1,4 @@
+storePassword=deeptijoshi2025
+keyPassword=deeptijoshi2025
+keyAlias=upload
+storeFile=upload-keystore.jks

@@ -53,21 +53,41 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build Release APK
-        run: flutter build apk --release
+      - name: Configure Keystore for Release Signing
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          echo "storePassword=${KEYSTORE_PASSWORD:-deeptijoshi2025}" > android/key.properties
+          echo "keyPassword=${KEY_PASSWORD:-deeptijoshi2025}" >> android/key.properties
+          echo "keyAlias=${KEY_ALIAS:-upload}" >> android/key.properties
+          echo "storeFile=upload-keystore.jks" >> android/key.properties
 
-      - name: Determine Release Tag & Name
+      - name: Determine Release Tag & Version
         id: vars
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
-            echo "title=${{ github.event.inputs.release_title }}" >> $GITHUB_OUTPUT
-            echo "notes=${{ github.event.inputs.release_notes }}" >> $GITHUB_OUTPUT
+            TAG="${{ github.event.inputs.tag_name }}"
+            TITLE="${{ github.event.inputs.release_title }}"
+            NOTES="${{ github.event.inputs.release_notes }}"
           else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "title=Release ${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "notes=Release ${{ github.ref_name }} is ready for testing." >> $GITHUB_OUTPUT
+            TAG="${{ github.ref_name }}"
+            TITLE="Release ${{ github.ref_name }}"
+            NOTES="Release ${{ github.ref_name }} is ready for testing."
           fi
+          CLEAN_VERSION=$(echo "$TAG" | sed 's/^[vV]//')
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+          echo "notes=$NOTES" >> $GITHUB_OUTPUT
+          echo "build_name=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=${{ github.run_number }}" >> $GITHUB_OUTPUT
+
+      - name: Build Release APK
+        run: flutter build apk --release --build-name=${{ steps.vars.outputs.build_name }} --build-number=${{ steps.vars.outputs.build_number }}
 
       - name: Create GitHub Release and Upload APK
         uses: softprops/action-gh-release@v2
