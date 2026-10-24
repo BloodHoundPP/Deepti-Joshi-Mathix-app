@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/demo_config.dart';
 import '../config/supabase_config.dart';
 import '../models/batch_model.dart';
 import '../models/student_model.dart';
@@ -9,6 +10,7 @@ import '../models/fee_model.dart';
 
 class SupabaseService {
   static SupabaseClient? get client {
+    if (DemoConfig.isDemoMode) return null;
     if (!SupabaseConfig.isConfigured) return null;
     try {
       return Supabase.instance.client;
@@ -17,7 +19,7 @@ class SupabaseService {
     }
   }
 
-  static bool get isReady => client != null;
+  static bool get isReady => !DemoConfig.isDemoMode && client != null;
 
   // ===================== BATCHES =====================
   static Future<List<BatchModel>> getBatches() async {

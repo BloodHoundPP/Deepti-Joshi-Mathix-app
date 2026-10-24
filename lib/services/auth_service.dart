@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/demo_config.dart';
 import '../config/supabase_config.dart';
 
 class AuthService {
   /// Get active Supabase client
   static SupabaseClient? get _client {
+    if (DemoConfig.isDemoMode) return null;
     if (!SupabaseConfig.isConfigured) return null;
     try {
       return Supabase.instance.client;
@@ -15,18 +17,22 @@ class AuthService {
   }
 
   /// Whether Supabase Cloud Auth is configured and ready
-  static bool get isCloudReady => _client != null;
+  static bool get isCloudReady => !DemoConfig.isDemoMode && _client != null;
 
   /// Get the current authenticated user from Supabase
   static User? get currentSupabaseUser => _client?.auth.currentUser;
 
   /// Check if teacher is currently logged in via Supabase Auth
   static Future<bool> isAuthenticated() async {
+    if (DemoConfig.isDemoMode) return true;
     return isCloudReady && _client?.auth.currentSession != null;
   }
 
   /// Get the display email for the teacher
   static Future<String> getTeacherEmail() async {
+    if (DemoConfig.isDemoMode) {
+      return 'prof.deepti.demo@mathix.edu';
+    }
     if (isCloudReady && currentSupabaseUser?.email != null) {
       return currentSupabaseUser!.email!;
     }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'config/demo_config.dart';
 import 'config/supabase_config.dart';
 import 'providers/app_provider.dart';
 import 'screens/auth/auth_gate.dart';
@@ -17,8 +18,10 @@ void main() async {
     debugPrint('Could not load .env file: $e');
   }
 
-  // Initialize Supabase if credentials are provided in .env
-  if (SupabaseConfig.isConfigured) {
+  // Initialize Supabase if credentials are provided in .env (bypassed in Demo Mode)
+  if (DemoConfig.isDemoMode) {
+    debugPrint('🌟 RUNNING IN PORTFOLIO DEMO MODE (Supabase Cloud Bypassed) 🌟');
+  } else if (SupabaseConfig.isConfigured) {
     try {
       await Supabase.initialize(
         url: SupabaseConfig.url,

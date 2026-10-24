@@ -1,29 +1,60 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/demo_config.dart';
 import '../models/batch_model.dart';
 import '../models/student_model.dart';
 import '../models/test_model.dart';
 import '../models/attendance_model.dart';
 import '../models/fee_model.dart';
+import 'mock_data_service.dart';
 import 'supabase_service.dart';
 
 class StorageService {
-  static const String _keyBatches = 'coaching_batches_v1';
-  static const String _keyStudents = 'coaching_students_v1';
-  static const String _keyTests = 'coaching_tests_v1';
-  static const String _keyMarks = 'coaching_marks_v1';
-  static const String _keyAttendance = 'coaching_attendance_v1';
-  static const String _keyFees = 'coaching_fees_v1';
+  static String get _keyBatches =>
+      DemoConfig.isDemoMode ? 'demo_batches_v1' : 'coaching_batches_v1';
+  static String get _keyStudents =>
+      DemoConfig.isDemoMode ? 'demo_students_v1' : 'coaching_students_v1';
+  static String get _keyTests =>
+      DemoConfig.isDemoMode ? 'demo_tests_v1' : 'coaching_tests_v1';
+  static String get _keyMarks =>
+      DemoConfig.isDemoMode ? 'demo_marks_v1' : 'coaching_marks_v1';
+  static String get _keyAttendance =>
+      DemoConfig.isDemoMode ? 'demo_attendance_v1' : 'coaching_attendance_v1';
+  static String get _keyFees =>
+      DemoConfig.isDemoMode ? 'demo_fees_v1' : 'coaching_fees_v1';
   static const String _keyProductionCleaned = 'coaching_production_cleaned_v1';
+  static const String _keyDemoSeeded = 'demo_data_seeded_v1';
 
-  /// Ensures that any old debug mock data cached in local device storage is purged once.
+  /// Ensures that any old debug mock data cached in local device storage is purged once in production,
+  /// or seeds fresh demo data if running in Demo Mode.
   static Future<void> ensureProductionClean() async {
     final prefs = await SharedPreferences.getInstance();
+    if (DemoConfig.isDemoMode) {
+      final seeded = prefs.getBool(_keyDemoSeeded) ?? false;
+      if (!seeded) {
+        await resetDemoData();
+      }
+      return;
+    }
+
     if (!(prefs.getBool(_keyProductionCleaned) ?? false)) {
       await resetAllData();
       await prefs.setBool(_keyProductionCleaned, true);
     }
+  }
+
+  /// Resets and seeds pristine mock data for portfolio recordings.
+  static Future<void> resetDemoData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mock = MockDataService.generateMockData();
+    await _saveBatchesLocal(mock.batches);
+    await _saveStudentsLocal(mock.students);
+    await _saveTestsLocal(mock.tests);
+    await _saveTestMarksLocal(mock.marks);
+    await _saveAttendanceLocal(mock.attendance);
+    await _saveFeesLocal(mock.fees);
+    await prefs.setBool(_keyDemoSeeded, true);
   }
 
   // ===================== BATCHES =====================
@@ -53,16 +84,6 @@ class StorageService {
 
   static Future<void> saveBatches(List<BatchModel> batches) async {
     await _saveBatchesLocal(batches);
-
-    if (SupabaseService.isReady) {
-      for (final b in batches) {
-        try {
-          await SupabaseService.upsertBatch(b);
-        } catch (e) {
-          debugPrint('Supabase saveBatches error for ${b.id}: $e');
-        }
-      }
-    }
   }
 
   static Future<void> upsertBatchCloud(BatchModel batch) async {
@@ -108,16 +129,6 @@ class StorageService {
 
   static Future<void> saveStudents(List<StudentModel> students) async {
     await _saveStudentsLocal(students);
-
-    if (SupabaseService.isReady) {
-      for (final s in students) {
-        try {
-          await SupabaseService.upsertStudent(s);
-        } catch (e) {
-          debugPrint('Supabase saveStudents error for ${s.id}: $e');
-        }
-      }
-    }
   }
 
   static Future<void> upsertStudentCloud(StudentModel student) async {
@@ -163,16 +174,6 @@ class StorageService {
 
   static Future<void> saveTests(List<TestModel> tests) async {
     await _saveTestsLocal(tests);
-
-    if (SupabaseService.isReady) {
-      for (final t in tests) {
-        try {
-          await SupabaseService.upsertTest(t);
-        } catch (e) {
-          debugPrint('Supabase saveTests error for ${t.id}: $e');
-        }
-      }
-    }
   }
 
   static Future<void> upsertTestCloud(TestModel test) async {
@@ -218,16 +219,6 @@ class StorageService {
 
   static Future<void> saveTestMarks(List<StudentTestMarkModel> marks) async {
     await _saveTestMarksLocal(marks);
-
-    if (SupabaseService.isReady) {
-      for (final m in marks) {
-        try {
-          await SupabaseService.upsertTestMark(m);
-        } catch (e) {
-          debugPrint('Supabase saveTestMarks error for ${m.id}: $e');
-        }
-      }
-    }
   }
 
   static Future<void> upsertTestMarkCloud(StudentTestMarkModel mark) async {
@@ -273,16 +264,6 @@ class StorageService {
 
   static Future<void> saveAttendance(List<AttendanceRecordModel> attendance) async {
     await _saveAttendanceLocal(attendance);
-
-    if (SupabaseService.isReady) {
-      for (final a in attendance) {
-        try {
-          await SupabaseService.upsertAttendance(a);
-        } catch (e) {
-          debugPrint('Supabase saveAttendance error for ${a.id}: $e');
-        }
-      }
-    }
   }
 
   static Future<void> upsertAttendanceCloud(AttendanceRecordModel attendance) async {
@@ -328,16 +309,6 @@ class StorageService {
 
   static Future<void> saveFees(List<FeeRecordModel> fees) async {
     await _saveFeesLocal(fees);
-
-    if (SupabaseService.isReady) {
-      for (final f in fees) {
-        try {
-          await SupabaseService.upsertFee(f);
-        } catch (e) {
-          debugPrint('Supabase saveFees error for ${f.id}: $e');
-        }
-      }
-    }
   }
 
   static Future<void> upsertFeeCloud(FeeRecordModel fee) async {

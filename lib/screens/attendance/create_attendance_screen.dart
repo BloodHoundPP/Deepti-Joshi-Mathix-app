@@ -34,7 +34,6 @@ class _CreateAttendanceScreenState extends State<CreateAttendanceScreen> {
   late DateTime _selectedDate;
   late TextEditingController _topicController;
   final Map<String, bool> _attendanceMap = {};
-  bool _initialized = false;
   AttendanceSortMode _attendanceSortMode = AttendanceSortMode.alphabetical;
 
   @override
@@ -47,7 +46,6 @@ class _CreateAttendanceScreenState extends State<CreateAttendanceScreen> {
 
     if (rec != null) {
       _attendanceMap.addAll(rec.records);
-      _initialized = true;
     }
   }
 
@@ -58,11 +56,9 @@ class _CreateAttendanceScreenState extends State<CreateAttendanceScreen> {
   }
 
   void _syncStudents(List<StudentModel> students) {
-    if (_initialized) return;
     for (final s in students) {
-      _attendanceMap.putIfAbsent(s.id, () => true); // default present
+      _attendanceMap.putIfAbsent(s.id, () => true);
     }
-    _initialized = true;
   }
 
   void _markAll(bool status, List<StudentModel> students) {
@@ -264,7 +260,6 @@ class _CreateAttendanceScreenState extends State<CreateAttendanceScreen> {
                       onChanged: (val) {
                         setState(() {
                           _selectedBatchId = val;
-                          _initialized = false;
                           _attendanceMap.clear();
                         });
                       },

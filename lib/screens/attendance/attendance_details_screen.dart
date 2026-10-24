@@ -22,7 +22,10 @@ class _AttendanceDetailsScreenState extends State<AttendanceDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppProvider>(context);
-    final record = widget.attendanceRecord;
+    final record = provider.attendance.firstWhere(
+      (a) => a.id == widget.attendanceRecord.id,
+      orElse: () => widget.attendanceRecord,
+    );
     final batch = provider.getBatchById(record.batchId);
     final allStudents = provider.getStudentsByBatch(record.batchId);
 

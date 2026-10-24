@@ -18,6 +18,7 @@ import 'fees/create_fee_screen.dart';
 import 'fees/payment_details_dialog.dart';
 import 'reports/reports_screen.dart';
 import 'reports/student_report_screen.dart';
+import '../config/demo_config.dart';
 import '../services/auth_service.dart';
 import '../services/update_service.dart';
 import 'auth/auth_gate.dart';
@@ -84,6 +85,13 @@ class DashboardScreen extends StatelessWidget {
                 _showSupabaseSyncDialog(context, provider);
               } else if (val == 'check_updates') {
                 UpdateService.instance.checkForUpdates(context, showNotificationIfLatest: true);
+              } else if (val == 'reset_demo') {
+                provider.reloadDemoData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Demo data has been refreshed to initial state.'),
+                  ),
+                );
               } else if (val == 'sign_out') {
                 _confirmSignOut(context);
               }
@@ -99,16 +107,28 @@ class DashboardScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const PopupMenuItem(
-                value: 'cloud_sync',
-                child: Row(
-                  children: [
-                    Icon(Icons.cloud_sync_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Text('Cloud Backup & Sync'),
-                  ],
+              if (!DemoConfig.isDemoMode)
+                const PopupMenuItem(
+                  value: 'cloud_sync',
+                  child: Row(
+                    children: [
+                      Icon(Icons.cloud_sync_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('Cloud Backup & Sync'),
+                    ],
+                  ),
                 ),
-              ),
+              if (DemoConfig.isDemoMode)
+                const PopupMenuItem(
+                  value: 'reset_demo',
+                  child: Row(
+                    children: [
+                      Icon(Icons.restore_rounded, size: 18, color: Colors.indigo),
+                      SizedBox(width: 8),
+                      Text('Reset Demo Data'),
+                    ],
+                  ),
+                ),
               const PopupMenuItem(
                 value: 'check_updates',
                 child: Row(

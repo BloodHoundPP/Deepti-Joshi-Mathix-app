@@ -49,6 +49,14 @@ class AppProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Re-seeds and refreshes clean mock data in Demo Mode
+  Future<void> reloadDemoData() async {
+    _isLoading = true;
+    notifyListeners();
+    await StorageService.resetDemoData();
+    await init();
+  }
+
   Future<void> syncAllToSupabase() async {
     if (!SupabaseService.isReady) return;
     _isLoading = true;
@@ -82,6 +90,7 @@ class AppProvider with ChangeNotifier {
 
   Future<void> addBatch(BatchModel batch) async {
     _batches.add(batch);
+    notifyListeners();
     await StorageService.saveBatches(_batches);
     if (SupabaseService.isReady) {
       try {
@@ -90,13 +99,13 @@ class AppProvider with ChangeNotifier {
         debugPrint('Supabase direct addBatch error: $e');
       }
     }
-    notifyListeners();
   }
 
   Future<void> updateBatch(BatchModel batch) async {
     final index = _batches.indexWhere((b) => b.id == batch.id);
     if (index != -1) {
       _batches[index] = batch;
+      notifyListeners();
       await StorageService.saveBatches(_batches);
       if (SupabaseService.isReady) {
         try {
@@ -105,19 +114,18 @@ class AppProvider with ChangeNotifier {
           debugPrint('Supabase direct updateBatch error: $e');
         }
       }
-      notifyListeners();
     }
   }
 
   Future<void> deleteBatch(String batchId) async {
     _batches.removeWhere((b) => b.id == batchId);
+    notifyListeners();
     await StorageService.saveBatches(_batches);
     if (SupabaseService.isReady) {
       try {
         await SupabaseService.deleteBatch(batchId);
       } catch (_) {}
     }
-    notifyListeners();
   }
 
   // --- STUDENT MANAGEMENT ---
@@ -138,6 +146,7 @@ class AppProvider with ChangeNotifier {
   Future<void> addStudent(StudentModel student) async {
     _students.add(student);
     _students.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+    notifyListeners();
     await StorageService.saveStudents(_students);
     if (SupabaseService.isReady) {
       try {
@@ -150,7 +159,6 @@ class AppProvider with ChangeNotifier {
         debugPrint('Supabase direct addStudent error: $e');
       }
     }
-    notifyListeners();
   }
 
   Future<void> updateStudent(StudentModel student) async {
@@ -158,6 +166,7 @@ class AppProvider with ChangeNotifier {
     if (index != -1) {
       _students[index] = student;
       _students.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+      notifyListeners();
       await StorageService.saveStudents(_students);
       if (SupabaseService.isReady) {
         try {
@@ -170,7 +179,6 @@ class AppProvider with ChangeNotifier {
           debugPrint('Supabase direct updateStudent error: $e');
         }
       }
-      notifyListeners();
     }
   }
 
@@ -204,6 +212,7 @@ class AppProvider with ChangeNotifier {
 
   Future<void> addTest(TestModel test) async {
     _tests.add(test);
+    notifyListeners();
     await StorageService.saveTests(_tests);
     if (SupabaseService.isReady) {
       try {
@@ -216,13 +225,13 @@ class AppProvider with ChangeNotifier {
         debugPrint('Supabase direct addTest error: $e');
       }
     }
-    notifyListeners();
   }
 
   Future<void> updateTest(TestModel test) async {
     final index = _tests.indexWhere((t) => t.id == test.id);
     if (index != -1) {
       _tests[index] = test;
+      notifyListeners();
       await StorageService.saveTests(_tests);
       if (SupabaseService.isReady) {
         try {
@@ -235,13 +244,13 @@ class AppProvider with ChangeNotifier {
           debugPrint('Supabase direct updateTest error: $e');
         }
       }
-      notifyListeners();
     }
   }
 
   Future<void> deleteTest(String testId) async {
     _tests.removeWhere((t) => t.id == testId);
     _marks.removeWhere((m) => m.testId == testId);
+    notifyListeners();
     await StorageService.saveTests(_tests);
     await StorageService.saveTestMarks(_marks);
     if (SupabaseService.isReady) {
@@ -249,7 +258,6 @@ class AppProvider with ChangeNotifier {
         await SupabaseService.deleteTest(testId);
       } catch (_) {}
     }
-    notifyListeners();
   }
 
   // Student Test Marks
@@ -278,6 +286,7 @@ class AppProvider with ChangeNotifier {
     } else {
       _marks.add(mark);
     }
+    notifyListeners();
     await StorageService.saveTestMarks(_marks);
     if (SupabaseService.isReady) {
       try {
@@ -286,7 +295,6 @@ class AppProvider with ChangeNotifier {
         debugPrint('Supabase direct saveStudentMark error: $e');
       }
     }
-    notifyListeners();
   }
 
   Future<void> batchSaveMarks(List<StudentTestMarkModel> newMarks) async {
@@ -305,8 +313,8 @@ class AppProvider with ChangeNotifier {
         } catch (_) {}
       }
     }
-    await StorageService.saveTestMarks(_marks);
     notifyListeners();
+    await StorageService.saveTestMarks(_marks);
   }
 
   // --- ATTENDANCE MANAGEMENT ---
@@ -323,6 +331,7 @@ class AppProvider with ChangeNotifier {
     } else {
       _attendance.insert(0, record);
     }
+    notifyListeners();
     await StorageService.saveAttendance(_attendance);
     if (SupabaseService.isReady) {
       try {
@@ -335,18 +344,17 @@ class AppProvider with ChangeNotifier {
         debugPrint('Supabase direct saveAttendance error: $e');
       }
     }
-    notifyListeners();
   }
 
   Future<void> deleteAttendanceRecord(String id) async {
     _attendance.removeWhere((a) => a.id == id);
+    notifyListeners();
     await StorageService.saveAttendance(_attendance);
     if (SupabaseService.isReady) {
       try {
         await SupabaseService.deleteAttendance(id);
       } catch (_) {}
     }
-    notifyListeners();
   }
 
   double getStudentAttendancePercentage(String studentId, String batchId) {
@@ -373,6 +381,7 @@ class AppProvider with ChangeNotifier {
 
   Future<void> addFee(FeeRecordModel fee) async {
     _fees.add(fee);
+    notifyListeners();
     await StorageService.saveFees(_fees);
     if (SupabaseService.isReady) {
       try {
@@ -389,13 +398,13 @@ class AppProvider with ChangeNotifier {
         debugPrint('Supabase direct addFee error: $e');
       }
     }
-    notifyListeners();
   }
 
   Future<void> updateFee(FeeRecordModel fee) async {
     final index = _fees.indexWhere((f) => f.id == fee.id);
     if (index != -1) {
       _fees[index] = fee;
+      notifyListeners();
       await StorageService.saveFees(_fees);
       if (SupabaseService.isReady) {
         try {
@@ -404,7 +413,6 @@ class AppProvider with ChangeNotifier {
           debugPrint('Supabase direct updateFee error: $e');
         }
       }
-      notifyListeners();
     }
   }
 
@@ -430,6 +438,7 @@ class AppProvider with ChangeNotifier {
         paidDate: DateTime.now(),
       );
       _fees[index] = updated;
+      notifyListeners();
       await StorageService.saveFees(_fees);
       if (SupabaseService.isReady) {
         try {
@@ -438,19 +447,18 @@ class AppProvider with ChangeNotifier {
           debugPrint('Supabase direct recordPayment error: $e');
         }
       }
-      notifyListeners();
     }
   }
 
   Future<void> deleteFee(String feeId) async {
     _fees.removeWhere((f) => f.id == feeId);
+    notifyListeners();
     await StorageService.saveFees(_fees);
     if (SupabaseService.isReady) {
       try {
         await SupabaseService.deleteFee(feeId);
       } catch (_) {}
     }
-    notifyListeners();
   }
 
   // --- ANALYTICS & DASHBOARD AGGREGATES ---
